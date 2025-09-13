@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>Sepolia 猜數字遊戲</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+</head>
+<body style="font-family: Arial; padding: 20px;">
+  <h1>🎲 Sepolia 猜數字遊戲</h1>
+  <p>遊戲規則：每次猜題需支付 <b>0.001 ETH</b>，答案範圍 <b>0 - 10000</b>。</p>
+
+  <!-- 連接 MetaMask -->
+  <button onclick="connectWallet()">🔗 連接錢包</button>
+  <p id="wallet">尚未連接</p>
+
+  <label for="guessInput">請輸入你的數字：</label>
+  <input type="number" id="guessInput" min="0" max="10000">
+  <button onclick="guessNumber()">提交猜測</button>
+
+  <h3>💰 獎池狀態</h3>
+  <button onclick="getPool()">查看獎池餘額</button>
+  <p id="pool">--</p>
+
+  <h3>📢 狀態</h3>
+  <pre id="status"></pre>
+
+  <script>
+    // ⚠️ 部署合約後，把這裡換成你的合約地址
+    const contractAddress = "0x9b831a6cfea951b9d575c73a0c7737e0a0f47823";
+
+    const contractABI = [
+      "function guess(uint16 _guess) external payable",
+      "function getBalance() external view returns (uint256)"
+    ];
+
+    let provider, signer, contract;
+
+    async function connectWallet() {
+      if (!window.ethereum) {
+        alert("❌ 請先安裝 MetaMask");
+        return;
+      }
+      try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        const addr = await signer.getAddress();
+        document.getElementById("wallet").innerText = "✅ 已連接: " + addr;
+        contract = new ethers.Contract(contractAddress, contractABI, signer);
+      } catch (err) {
+        console.error(err);
+        document.getElementById("wallet").innerText = "⚠️ 連線失敗";
+      }
+    }
+
+    async function guessNumber() {
+      try {
+        if (!contract) {
+          alert("請先連接錢包");
+          return;
+        }
+        const num = document.getElementById("guessInput").value;
+        if (!num) {
+          alert("請輸入數字");
+          return;
+        }
+        const tx = await contract.guess(num, {
+          value: ethers.utils.parseEther("0.001")
+        });
+        document.getElementById("status").innerText = "⏳ 交易送出中: " + tx.hash;
+        await tx.wait();
+        document.getElementById("status").innerText = "🎉 交易完成: " + tx.hash;
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "⚠️ 錯誤: " + err.message;
+      }
+    }
+
+    async function getPool() {
+      try {
+        if (!contract) {
+          alert("請先連接錢包");
+          return;
+        }
+        const balance = await contract.getBalance();
+        const ethBal = ethers.utils.formatEther(balance);
+        document.getElementById("pool").innerText = `目前獎池: ${ethBal} ETH`;
+      } catch (err) {
+        console.error(err);
+        document.getElementById("pool").innerText = "⚠️ 無法讀取獎池";
+      }
+    }
+  </script>
+</body>
+</html>
